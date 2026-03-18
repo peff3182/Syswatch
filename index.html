@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d0d0d">
+<title>SysWatch</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0d0d0d;
+  --bg2:      #141414;
+  --bg3:      #1c1c1c;
+  --accent:   #e8ff3b;
+  --accent2:  #ff6b35;
+  --green:    #39ff85;
+  --red:      #ff3b5c;
+  --blue:     #3baaff;
+  --text:     #f0f0f0;
+  --dim:      #555;
+  --border:   rgba(232,255,59,0.12);
+  --mono:     'IBM Plex Mono', monospace;
+  --sans:     'Syne', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; overflow:hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scanlines overlay */
+body::after {
+  content:'';
+  position:fixed; inset:0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px);
+  pointer-events:none; z-index:9999;
+}
+
+/* ── HEADER ── */
+header {
+  flex-shrink:0;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 18px;
+  border-bottom:1px solid var(--border);
+  background: var(--bg);
+}
+.brand { display:flex; align-items:center; gap:10px; }
+.brand-icon {
+  width:34px; height:34px;
+  background: var(--accent);
+  border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1rem;
+}
+.brand-name {
+  font-family: var(--sans);
+  font-weight:800; font-size:1.1rem;
+  letter-spacing:1px;
+  color: var(--accent);
+}
+.brand-tag {
+  display:block;
+  font-family: var(--mono);
+  font-size:0.6rem; color:var(--dim);
+  letter-spacing:2px; text-transform:uppercase;
+}
+.conn-pill {
+  display:flex; align-items:center; gap:6px;
+  padding:5px 12px;
+  border-radius:20px;
+  border:1px solid var(--border);
+  font-family:var(--mono); font-size:0.65rem;
+  color:var(--dim);
+  transition:all 0.3s;
+}
+.conn-pill.live { border-color:rgba(57,255,133,0.4); color:var(--green); }
+.conn-pill.dead { border-color:rgba(255,59,92,0.4);  color:var(--red); }
+.pill-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.pill-dot.live { animation: blink 1.2s infinite; }
+
+/* ── TABS ── */
+.tabs {
+  flex-shrink:0;
+  display:flex;
+  border-bottom:1px solid var(--border);
+  background:var(--bg);
+}
+.tab {
+  flex:1; padding:10px 6px;
+  background:none; border:none;
+  font-family:var(--mono); font-size:0.65rem;
+  color:var(--dim); letter-spacing:1px; text-transform:uppercase;
+  cursor:pointer; position:relative;
+  transition:color 0.2s;
+}
+.tab.active { color:var(--accent); }
+.tab.active::after {
+  content:'';
+  position:absolute; bottom:0; left:10%; right:10%; height:2px;
+  background:var(--accent); border-radius:1px;
+}
+
+/* ── SCROLL AREA ── */
+.scroll-area {
+  flex:1; overflow-y:auto; overflow-x:hidden;
+  padding:14px 14px 90px;
+}
+.scroll-area::-webkit-scrollbar { width:3px; }
+.scroll-area::-webkit-scrollbar-thumb { background:var(--border); }
+
+/* ── VIEWS ── */
+.view { display:none; }
+.view.active { display:block; }
+
+/* ── CONFIG BOX ── */
+.config-box {
+  background:var(--bg2);
+  border:1px solid rgba(255,107,53,0.3);
+  border-radius:12px;
+  padding:16px;
+  margin-bottom:14px;
+}
+.config-box-title {
+  font-family:var(--mono); font-size:0.65rem;
+  color:var(--accent2); letter-spacing:2px;
+  text-transform:uppercase; margin-bottom:12px;
+}
+.field { margin-bottom:10px; }
+.field label {
+  display:block;
+  font-family:var(--mono); font-size:0.65rem;
+  color:var(--dim); letter-spacing:1px;
+  text-transform:uppercase; margin-bottom:4px;
+}
+.field input {
+  width:100%;
+  background:rgba(0,0,0,0.5);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  font-family:var(--mono); font-size:0.78rem;
+  padding:8px 12px; outline:none;
+  transition:border-color 0.2s;
+}
+.field input:focus { border-color:var(--accent); }
+.btn-row { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+.btn {
+  padding:8px 16px; border:none; border-radius:8px;
+  font-family:var(--sans); font-weight:700; font-size:0.75rem;
+  cursor:pointer; letter-spacing:1px; text-transform:uppercase;
+  transition:all 0.2s;
+}
+.btn-acc { background:var(--accent); color:#000; }
+.btn-acc:active { opacity:0.8; transform:scale(0.97); }
+.btn-ghost { background:transparent; border:1px solid var(--border); color:var(--dim); }
+.btn-ghost:active { border-color:var(--accent); color:var(--accent); }
+
+/* ── SECTION LABEL ── */
+.slabel {
+  font-family:var(--mono); font-size:0.6rem;
+  color:var(--dim); letter-spacing:3px;
+  text-transform:uppercase;
+  margin:18px 0 8px;
+  display:flex; align-items:center; gap:8px;
+}
+.slabel::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── STATUS CARD ── */
+.status-card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px;
+  margin-bottom:10px;
+  transition:border-color 0.4s, background 0.4s;
+}
+.status-card.on {
+  border-color:rgba(57,255,133,0.35);
+  background:linear-gradient(135deg,rgba(57,255,133,0.06),var(--bg2));
+}
+.status-card.off {
+  border-color:rgba(255,59,92,0.35);
+  background:linear-gradient(135deg,rgba(255,59,92,0.06),var(--bg2));
+}
+.sc-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+.sc-title { font-size:0.95rem; font-weight:700; }
+.sc-sub { font-family:var(--mono); font-size:0.65rem; color:var(--dim); margin-top:2px; }
+.tag {
+  padding:3px 10px; border-radius:20px;
+  font-family:var(--mono); font-size:0.6rem; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase;
+}
+.tag-on  { background:rgba(57,255,133,0.12); color:var(--green); border:1px solid rgba(57,255,133,0.25); }
+.tag-off { background:rgba(255,59,92,0.12);  color:var(--red);   border:1px solid rgba(255,59,92,0.25); }
+.tag-idle{ background:rgba(255,255,255,0.05);color:var(--dim);   border:1px solid var(--border); }
+.sc-detail {
+  font-family:var(--mono); font-size:0.72rem;
+  color:var(--dim); line-height:1.8;
+}
+.sc-detail em { color:var(--accent); font-style:normal; }
+
+/* ── METRIC GRID ── */
+.mgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+.mcard {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 14px 12px;
+  position:relative; overflow:hidden;
+}
+.mcard-icon { font-size:1.2rem; margin-bottom:6px; }
+.mcard-label {
+  font-family:var(--mono); font-size:0.58rem;
+  color:var(--dim); letter-spacing:2px; text-transform:uppercase;
+  margin-bottom:2px;
+}
+.mcard-val {
+  font-family:var(--mono); font-size:1.5rem;
+  color:var(--accent); line-height:1;
+  margin-bottom:4px;
+}
+.mcard-sub { font-family:var(--mono); font-size:0.6rem; color:var(--dim); }
+.pbar { height:3px; background:rgba(255,255,255,0.07); border-radius:2px; margin-top:8px; overflow:hidden; }
+.pfill { height:100%; border-radius:2px; background:var(--accent); transition:width 0.8s ease; }
+.pfill.warn   { background:var(--accent2); }
+.pfill.danger { background:var(--red); }
+
+/* ── TEMP CARD ── */
+.tcard {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px; margin-bottom:10px;
+}
+.tcard-head {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:12px;
+}
+.tcard-label { font-family:var(--mono); font-size:0.6rem; color:var(--dim); letter-spacing:2px; text-transform:uppercase; }
+.trow { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.trow:last-child { margin-bottom:0; }
+.trow-name { font-family:var(--mono); font-size:0.68rem; color:var(--dim); width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.trow-bar  { flex:1; height:5px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; }
+.trow-fill { height:100%; border-radius:3px; transition:width 0.8s; }
+.trow-val  { font-family:var(--mono); font-size:0.72rem; color:var(--text); width:44px; text-align:right; }
+
+/* ── PROCESS CARD ── */
+.proc-card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden; margin-bottom:10px;
+}
+.proc-head {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+}
+.proc-head-label { font-family:var(--mono); font-size:0.6rem; color:var(--dim); letter-spacing:2px; text-transform:uppercase; }
+.proc-list { max-height:200px; overflow-y:auto; }
+.proc-item {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 14px;
+  border-bottom:1px solid rgba(255,255,255,0.03);
+  animation:fadeIn 0.3s ease;
+}
+.proc-item:last-child { border-bottom:none; }
+.proc-name { font-family:var(--mono); font-size:0.7rem; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proc-cpu  { font-family:var(--mono); font-size:0.65rem; color:var(--accent2); width:52px; text-align:right; }
+.proc-ram  { font-family:var(--mono); font-size:0.65rem; color:var(--blue); width:52px; text-align:right; }
+
+/* ── LOG ── */
+.log-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:10px; }
+.log-head { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-bottom:1px solid var(--border); }
+.log-head-label { font-family:var(--mono); font-size:0.6rem; color:var(--dim); letter-spacing:2px; text-transform:uppercase; }
+.log-list { max-height:240px; overflow-y:auto; }
+.log-item { display:flex; gap:10px; padding:9px 14px; border-bottom:1px solid rgba(255,255,255,0.03); animation:fadeIn 0.3s ease; }
+.log-item:last-child { border-bottom:none; }
+.log-dot { width:7px; height:7px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+.log-dot.ev-on   { background:var(--green); }
+.log-dot.ev-off  { background:var(--red); }
+.log-dot.ev-warn { background:var(--accent2); }
+.log-dot.ev-info { background:var(--blue); }
+.log-dot.ev-proc { background:var(--accent); }
+.log-body { flex:1; }
+.log-msg  { font-family:var(--mono); font-size:0.7rem; color:var(--text); line-height:1.5; }
+.log-time { font-family:var(--mono); font-size:0.6rem; color:var(--dim); margin-top:2px; }
+
+/* ── COMMANDS VIEW ── */
+.cmd-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.cmd-btn {
+  background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+  padding:14px 10px; color:var(--text); font-family:var(--mono); font-size:0.68rem;
+  cursor:pointer; transition:all 0.2s;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  text-align:center;
+}
+.cmd-btn:active { border-color:var(--accent); color:var(--accent); background:rgba(232,255,59,0.05); transform:scale(0.97); }
+.cmd-icon { font-size:1.3rem; }
+.cmd-sent { border-color:rgba(57,255,133,0.4)!important; color:var(--green)!important; }
+
+/* ── SETTINGS VIEW ── */
+.set-group { background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:10px; }
+.set-item { display:flex; justify-content:space-between; align-items:center; padding:13px 16px; border-bottom:1px solid rgba(255,255,255,0.04); }
+.set-item:last-child { border-bottom:none; }
+.set-item-left .set-name { font-size:0.85rem; color:var(--text); }
+.set-item-left .set-sub  { font-family:var(--mono); font-size:0.62rem; color:var(--dim); margin-top:2px; }
+.tog { width:42px; height:22px; background:var(--bg3); border-radius:11px; border:1px solid var(--border); position:relative; cursor:pointer; transition:all 0.3s; flex-shrink:0; }
+.tog.on { background:rgba(232,255,59,0.15); border-color:rgba(232,255,59,0.4); }
+.tog::after { content:''; position:absolute; top:3px; left:3px; width:14px; height:14px; background:var(--dim); border-radius:50%; transition:all 0.3s; }
+.tog.on::after { left:23px; background:var(--accent); }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  flex-shrink:0;
+  display:flex;
+  border-top:1px solid var(--border);
+  background:rgba(13,13,13,0.97);
+  backdrop-filter:blur(10px);
+}
+.bnav-btn {
+  flex:1; padding:10px 0; background:none; border:none;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  cursor:pointer; color:var(--dim); transition:color 0.2s;
+  font-family:var(--mono); font-size:0.55rem; letter-spacing:1px; text-transform:uppercase;
+}
+.bnav-btn.active { color:var(--accent); }
+.bnav-icon { font-size:1.15rem; }
+
+/* ── ANIMATIONS ── */
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(0.85);opacity:0.5} }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="brand">
+    <div class="brand-icon">🖥</div>
+    <div>
+      <div class="brand-name">SysWatch</div>
+      <span class="brand-tag">PC Monitor</span>
+    </div>
+  </div>
+  <div class="conn-pill" id="conn-pill">
+    <div class="pill-dot" id="pill-dot"></div>
+    <span id="pill-text">OFFLINE</span>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" id="tab-dash"     onclick="switchTab('dash')">📡 Dashboard</button>
+  <button class="tab"        id="tab-procs"    onclick="switchTab('procs')">⚙️ Processus</button>
+  <button class="tab"        id="tab-cmd"      onclick="switchTab('cmd')">⌨️ Commandes</button>
+  <button class="tab"        id="tab-settings" onclick="switchTab('settings')">⚙ Config</button>
+</div>
+
+<!-- SCROLL -->
+<div class="scroll-area">
+
+  <!-- ══════════ DASHBOARD ══════════ -->
+  <div class="view active" id="view-dash">
+
+    <div class="config-box" id="cfg-box">
+      <div class="config-box-title">⚙ Configuration ntfy</div>
+      <div class="field">
+        <label>Serveur</label>
+        <input id="cfg-server" value="https://ntfy.sh" placeholder="https://ntfy.sh">
+      </div>
+      <div class="field">
+        <label>Canal notifications</label>
+        <input id="cfg-chan" placeholder="mon-pc-pascal">
+      </div>
+      <div class="field">
+        <label>Canal commandes</label>
+        <input id="cfg-cmd-chan" placeholder="mon-pc-pascal-cmd">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="loadConfig()">Annuler</button>
+        <button class="btn btn-acc"   onclick="saveAndConnect()">Connecter</button>
+      </div>
+    </div>
+
+    <!-- PC Status -->
+    <div class="slabel">État du PC</div>
+    <div class="status-card" id="pc-card">
+      <div class="sc-top">
+        <div>
+          <div class="sc-title" id="pc-title">En attente…</div>
+          <div class="sc-sub"   id="pc-sub">Aucun événement reçu</div>
+        </div>
+        <span class="tag tag-idle" id="pc-tag">IDLE</span>
+      </div>
+      <div class="sc-detail" id="pc-detail">
+        Uptime : <em>—</em><br>
+        Dernier événement : <em>—</em>
+      </div>
+    </div>
+
+    <!-- CPU + RAM -->
+    <div class="slabel">Ressources</div>
+    <div class="mgrid">
+      <div class="mcard">
+        <div class="mcard-icon">🖥️</div>
+        <div class="mcard-label">CPU</div>
+        <div class="mcard-val"  id="cpu-v">—</div>
+        <div class="mcard-sub"  id="cpu-s">Usage processeur</div>
+        <div class="pbar"><div class="pfill" id="cpu-bar" style="width:0"></div></div>
+      </div>
+      <div class="mcard">
+        <div class="mcard-icon">🧠</div>
+        <div class="mcard-label">RAM</div>
+        <div class="mcard-val"  id="ram-v">—</div>
+        <div class="mcard-sub"  id="ram-s">Mémoire vive</div>
+        <div class="pbar"><div class="pfill" id="ram-bar" style="width:0"></div></div>
+      </div>
+    </div>
+
+    <!-- Températures -->
+    <div class="tcard">
+      <div class="tcard-head">
+        <span class="tcard-label">🌡️ Températures</span>
+        <span class="tag tag-idle" id="temp-tag">—</span>
+      </div>
+      <div id="temp-list">
+        <div style="font-family:var(--mono);font-size:0.7rem;color:var(--dim)">En attente des données…</div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="slabel">Événements</div>
+    <div class="log-card">
+      <div class="log-head">
+        <span class="log-head-label">Journal</span>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:0.65rem;" onclick="clearLog('main-log')">Effacer</button>
+      </div>
+      <div class="log-list" id="main-log">
+        <div class="log-item">
+          <div class="log-dot ev-info"></div>
+          <div class="log-body"><div class="log-msg">En attente de connexion…</div><div class="log-time">Configurez ntfy ci-dessus</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PROCESSUS ══════════ -->
+  <div class="view" id="view-procs">
+    <div class="slabel">Processus actifs</div>
+    <div class="proc-card">
+      <div class="proc-head">
+        <span class="proc-head-label">Top processus (CPU)</span>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:0.65rem;" onclick="sendCmd('procs')">Actualiser</button>
+      </div>
+      <div class="proc-list" id="proc-list">
+        <div class="log-item"><div class="log-dot ev-info"></div><div class="log-body"><div class="log-msg">Envoie la commande "procs" pour actualiser</div></div></div>
+      </div>
+    </div>
+
+    <div class="slabel">Historique processus</div>
+    <div class="log-card">
+      <div class="log-head">
+        <span class="log-head-label">Démarrages / Arrêts</span>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:0.65rem;" onclick="clearLog('proc-log')">Effacer</button>
+      </div>
+      <div class="log-list" id="proc-log">
+        <div class="log-item"><div class="log-dot ev-info"></div><div class="log-body"><div class="log-msg">Aucun événement processus</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ COMMANDES ══════════ -->
+  <div class="view" id="view-cmd">
+    <div class="slabel">Commandes rapides</div>
+    <div class="cmd-grid">
+      <button class="cmd-btn" id="cbtn-stats"  onclick="sendCmd('stats')"> <span class="cmd-icon">📊</span>Stats complètes</button>
+      <button class="cmd-btn" id="cbtn-cpu"    onclick="sendCmd('cpu')">   <span class="cmd-icon">🖥️</span>CPU</button>
+      <button class="cmd-btn" id="cbtn-ram"    onclick="sendCmd('ram')">   <span class="cmd-icon">🧠</span>RAM</button>
+      <button class="cmd-btn" id="cbtn-temp"   onclick="sendCmd('temp')">  <span class="cmd-icon">🌡️</span>Températures</button>
+      <button class="cmd-btn" id="cbtn-procs"  onclick="sendCmd('procs')"> <span class="cmd-icon">📋</span>Processus</button>
+      <button class="cmd-btn" id="cbtn-disk"   onclick="sendCmd('disk')">  <span class="cmd-icon">💾</span>Disques</button>
+      <button class="cmd-btn" id="cbtn-uptime" onclick="sendCmd('uptime')"><span class="cmd-icon">⏱️</span>Uptime</button>
+      <button class="cmd-btn" id="cbtn-ping"   onclick="sendCmd('ping')">  <span class="cmd-icon">📡</span>Ping</button>
+    </div>
+
+    <div class="slabel">Commande libre</div>
+    <div class="config-box" style="padding:14px;">
+      <div style="display:flex;gap:8px;">
+        <input class="field" id="free-cmd" placeholder="Ex: stats" style="flex:1;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:0.78rem;padding:8px 12px;outline:none;">
+        <button class="btn btn-acc" onclick="sendFreeCmd()">→</button>
+      </div>
+    </div>
+
+    <div class="slabel">Réponses reçues</div>
+    <div class="log-card">
+      <div class="log-head">
+        <span class="log-head-label">Log commandes</span>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:0.65rem;" onclick="clearLog('cmd-log')">Effacer</button>
+      </div>
+      <div class="log-list" id="cmd-log">
+        <div class="log-item"><div class="log-dot ev-info"></div><div class="log-body"><div class="log-msg">Aucune commande envoyée</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ SETTINGS ══════════ -->
+  <div class="view" id="view-settings">
+    <div class="slabel">Connexion actuelle</div>
+    <div class="set-group">
+      <div class="set-item"><div class="set-item-left"><div class="set-name">Serveur ntfy</div><div class="set-sub" id="s-server">—</div></div></div>
+      <div class="set-item"><div class="set-item-left"><div class="set-name">Canal notifications</div><div class="set-sub" id="s-chan">—</div></div></div>
+      <div class="set-item"><div class="set-item-left"><div class="set-name">Canal commandes</div><div class="set-sub" id="s-cmd-chan">—</div></div></div>
+    </div>
+
+    <div class="slabel">Notifications</div>
+    <div class="set-group">
+      <div class="set-item">
+        <div class="set-item-left"><div class="set-name">Démarrage PC</div><div class="set-sub">Notifier au boot</div></div>
+        <div class="tog on" id="tog-boot"  onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="set-item">
+        <div class="set-item-left"><div class="set-name">Alertes CPU/RAM/Temp</div><div class="set-sub">Seuils dépassés</div></div>
+        <div class="tog on" id="tog-alert" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="set-item">
+        <div class="set-item-left"><div class="set-name">Processus surveillés</div><div class="set-sub">Démarrage / arrêt</div></div>
+        <div class="tog on" id="tog-proc"  onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <div class="slabel">Actions</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+      <button class="btn btn-ghost" onclick="reconnect()">🔄 &nbsp;Reconnecter</button>
+      <button class="btn btn-ghost" style="color:var(--red);border-color:rgba(255,59,92,0.3);" onclick="resetAll()">🗑️ &nbsp;Réinitialiser</button>
+    </div>
+
+    <div style="text-align:center;padding:16px 0;">
+      <div style="font-family:var(--mono);font-size:0.6rem;color:var(--dim);letter-spacing:2px;">
+        SYSWATCH v1.0<br>
+        <span style="opacity:0.4">powered by ntfy.sh + psutil</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /scroll-area -->
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="bnav-btn active" id="bnav-dash"     onclick="switchTab('dash')">    <span class="bnav-icon">📡</span>Dashboard</button>
+  <button class="bnav-btn"        id="bnav-procs"    onclick="switchTab('procs')">   <span class="bnav-icon">⚙️</span>Processus</button>
+  <button class="bnav-btn"        id="bnav-cmd"      onclick="switchTab('cmd')">     <span class="bnav-icon">⌨️</span>Commandes</button>
+  <button class="bnav-btn"        id="bnav-settings" onclick="switchTab('settings')"><span class="bnav-icon">⚙</span>Config</button>
+</nav>
+
+<script>
+// ═══════════════════════════════
+//  STATE
+// ═══════════════════════════════
+let cfg = { server:'https://ntfy.sh', chan:'', cmdChan:'' };
+let es  = null;
+let logs     = { 'main-log':[], 'proc-log':[], 'cmd-log':[] };
+let procData = [];
+
+// ═══════════════════════════════
+//  CONFIG
+// ═══════════════════════════════
+function loadConfig() {
+  const s = localStorage.getItem('syswatch');
+  if (s) { cfg = JSON.parse(s); }
+  document.getElementById('cfg-server').value   = cfg.server  || 'https://ntfy.sh';
+  document.getElementById('cfg-chan').value      = cfg.chan    || '';
+  document.getElementById('cfg-cmd-chan').value  = cfg.cmdChan || '';
+  document.getElementById('s-server').textContent  = cfg.server  || '—';
+  document.getElementById('s-chan').textContent     = cfg.chan    || '—';
+  document.getElementById('s-cmd-chan').textContent = cfg.cmdChan || '—';
+}
+
+function saveAndConnect() {
+  cfg.server  = document.getElementById('cfg-server').value.trim();
+  cfg.chan     = document.getElementById('cfg-chan').value.trim();
+  cfg.cmdChan = document.getElementById('cfg-cmd-chan').value.trim();
+  if (!cfg.chan) { alert('Canal de notifications requis.'); return; }
+  localStorage.setItem('syswatch', JSON.stringify(cfg));
+  document.getElementById('s-server').textContent  = cfg.server;
+  document.getElementById('s-chan').textContent     = cfg.chan;
+  document.getElementById('s-cmd-chan').textContent = cfg.cmdChan || '—';
+  connect();
+}
+
+// ═══════════════════════════════
+//  SSE
+// ═══════════════════════════════
+function connect() {
+  if (es) es.close();
+  if (!cfg.chan) return;
+  setStatus('connecting');
+  es = new EventSource(`${cfg.server}/${cfg.chan}/sse`);
+  es.onopen  = () => { setStatus('online'); addLog('main-log','ev-info',`Connecté — ${cfg.chan}`, now()); };
+  es.onerror = () => { setStatus('offline'); setTimeout(connect, 6000); };
+  es.onmessage = e => {
+    try { const d = JSON.parse(e.data); if (d.event !== 'keepalive') handleMsg(d); } catch {}
+  };
+  es.addEventListener('message', e => {
+    try { const d = JSON.parse(e.data); if (d.event !== 'keepalive') handleMsg(d); } catch {}
+  });
+}
+
+function reconnect() { connect(); }
+
+// ═══════════════════════════════
+//  MESSAGE HANDLER
+// ═══════════════════════════════
+function handleMsg(d) {
+  const title = d.title || '';
+  const msg   = d.message || d.m || '';
+  const t     = new Date();
+
+  parseStats(msg);
+  parseProcesses(msg);
+
+  // PC boot
+  if (title.includes('démarré') || title.includes('✅')) {
+    setPcCard('on', 'PC en ligne', `Démarré à ${t.toLocaleTimeString('fr-FR')}`, 'ON');
+    addLog('main-log', 'ev-on', title + (msg ? '\n' + msg : ''), t);
+    notify(title, msg);
+    return;
+  }
+
+  // Alertes
+  if (title.includes('🔥') || title.includes('🌡')) {
+    addLog('main-log', 'ev-warn', title + '\n' + msg, t);
+    notify(title, msg);
+    return;
+  }
+
+  // Processus
+  if (title.includes('▶️') || title.includes('⏹️')) {
+    addLog('proc-log', title.includes('▶️') ? 'ev-proc' : 'ev-off', title + '\n' + msg, t);
+    addLog('main-log', 'ev-proc', title, t);
+    notify(title, msg);
+    return;
+  }
+
+  // Réponse commande
+  addLog('cmd-log', 'ev-info', title + (msg ? '\n' + msg : ''), t);
+  addLog('main-log', 'ev-info', title, t);
+}
+
+// ═══════════════════════════════
+//  STATS PARSING
+// ═══════════════════════════════
+function parseStats(msg) {
+  if (!msg) return;
+
+  const cpu = msg.match(/CPU\s*:\s*([\d.]+)%/i);
+  if (cpu) {
+    const v = parseFloat(cpu[1]);
+    document.getElementById('cpu-v').textContent = v.toFixed(1)+'%';
+    setBar('cpu-bar', v);
+  }
+
+  const ram = msg.match(/RAM\s*:\s*([\d.]+)%\s*\(([\d.]+)\s*\/\s*([\d.]+)/i);
+  if (ram) {
+    const v = parseFloat(ram[1]);
+    document.getElementById('ram-v').textContent = v.toFixed(1)+'%';
+    document.getElementById('ram-s').textContent = `${parseFloat(ram[2]).toFixed(1)} / ${parseFloat(ram[3]).toFixed(1)} Go`;
+    setBar('ram-bar', v);
+  }
+
+  const uptime = msg.match(/Uptime\s*:\s*(.+)/i);
+  if (uptime) {
+    document.getElementById('pc-detail').innerHTML = `Uptime : <em>${uptime[1].trim()}</em><br>Mis à jour : <em>${now()}</em>`;
+  }
+
+  // Températures
+  const ts = msg.split(/Températures\s*:/i)[1];
+  if (ts) {
+    const lines = ts.split('\n').map(l=>l.trim()).filter(l=>l.includes('°C'));
+    if (lines.length) renderTemps(lines);
+  }
+}
+
+function setBar(id, pct) {
+  const el = document.getElementById(id);
+  el.style.width = pct + '%';
+  el.className = 'pfill' + (pct > 90 ? ' danger' : pct > 75 ? ' warn' : '');
+}
+
+function renderTemps(lines) {
+  let max = 0, html = '';
+  lines.forEach(l => {
+    const m = l.match(/(.+?)\s*:\s*([\d.]+)°C/);
+    if (!m) return;
+    const name = m[1].trim(), val = parseFloat(m[2]);
+    if (val > max) max = val;
+    const pct   = Math.min(100, val);
+    const color = val > 85 ? 'var(--red)' : val > 70 ? 'var(--accent2)' : val > 50 ? 'var(--blue)' : 'var(--green)';
+    html += `<div class="trow"><span class="trow-name">${name}</span><div class="trow-bar"><div class="trow-fill" style="width:${pct}%;background:${color}"></div></div><span class="trow-val">${val.toFixed(0)}°C</span></div>`;
+  });
+  document.getElementById('temp-list').innerHTML = html;
+  const tag = document.getElementById('temp-tag');
+  if (max > 85) { tag.className='tag tag-off'; tag.textContent=`${max.toFixed(0)}°C ⚠`; }
+  else if (max > 0) { tag.className='tag tag-on'; tag.textContent=`${max.toFixed(0)}°C`; }
+}
+
+// ═══════════════════════════════
+//  PROCESSES
+// ═══════════════════════════════
+function parseProcesses(msg) {
+  if (!msg || !msg.includes('processus')) return;
+  const lines = msg.split('\n').filter(l => l.match(/^\s+\S+\s+CPU:/));
+  if (!lines.length) return;
+  const html = lines.map(l => {
+    const m = l.match(/^\s*(.+?)\s+CPU:\s*([\d.]+)%\s+RAM:([\d.]+)%/);
+    if (!m) return '';
+    return `<div class="proc-item"><span class="proc-name">${m[1]}</span><span class="proc-cpu">CPU ${m[2]}%</span><span class="proc-ram">RAM ${m[3]}%</span></div>`;
+  }).join('');
+  if (html) document.getElementById('proc-list').innerHTML = html;
+}
+
+// ═══════════════════════════════
+//  PC CARD
+// ═══════════════════════════════
+function setPcCard(state, title, sub, tagText) {
+  const card = document.getElementById('pc-card');
+  const tag  = document.getElementById('pc-tag');
+  card.className = `status-card ${state}`;
+  document.getElementById('pc-title').textContent = title;
+  document.getElementById('pc-sub').textContent   = sub;
+  tag.className   = `tag tag-${state === 'on' ? 'on' : 'off'}`;
+  tag.textContent = tagText;
+}
+
+// ═══════════════════════════════
+//  LOGS
+// ═══════════════════════════════
+function addLog(id, type, msg, t) {
+  if (!logs[id]) logs[id] = [];
+  logs[id].unshift({ type, msg, t });
+  if (logs[id].length > 40) logs[id].pop();
+  renderLog(id);
+}
+
+function renderLog(id) {
+  const el = document.getElementById(id);
+  if (!logs[id].length) { el.innerHTML='<div class="log-item"><div class="log-dot ev-info"></div><div class="log-body"><div class="log-msg">Aucun événement</div></div></div>'; return; }
+  el.innerHTML = logs[id].slice(0,20).map(l =>
+    `<div class="log-item"><div class="log-dot ${l.type}"></div><div class="log-body"><div class="log-msg">${l.msg.replace(/\n/g,'<br>').substring(0,150)}</div><div class="log-time">${l.t instanceof Date ? l.t.toLocaleTimeString('fr-FR') : l.t}</div></div></div>`
+  ).join('');
+}
+
+function clearLog(id) { logs[id]=[]; renderLog(id); }
+
+// ═══════════════════════════════
+//  COMMANDS
+// ═══════════════════════════════
+async function sendCmd(cmd) {
+  if (!cfg.cmdChan) { alert('Canal de commandes non configuré.'); return; }
+  const btnId = `cbtn-${cmd}`;
+  const btn   = document.getElementById(btnId);
+  if (btn) { btn.classList.add('cmd-sent'); setTimeout(()=>btn.classList.remove('cmd-sent'), 1500); }
+  try {
+    await fetch(`${cfg.server}/${cfg.cmdChan}`, { method:'POST', body:cmd, headers:{'Title':`CMD:${cmd}`} });
+    addLog('cmd-log','ev-info',`→ ${cmd} envoyé`, new Date());
+  } catch(e) {
+    addLog('cmd-log','ev-warn',`Erreur: ${e.message}`, new Date());
+  }
+}
+
+function sendFreeCmd() {
+  const v = document.getElementById('free-cmd').value.trim();
+  if (v) { sendCmd(v); document.getElementById('free-cmd').value=''; }
+}
+
+// ═══════════════════════════════
+//  UI
+// ═══════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab,.bnav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`view-${name}`).classList.add('active');
+  document.getElementById(`tab-${name}`)?.classList.add('active');
+  document.getElementById(`bnav-${name}`)?.classList.add('active');
+}
+
+function setStatus(s) {
+  const pill = document.getElementById('conn-pill');
+  const dot  = document.getElementById('pill-dot');
+  const txt  = document.getElementById('pill-text');
+  pill.className = `conn-pill ${s === 'online' ? 'live' : s === 'offline' ? 'dead' : ''}`;
+  dot.className  = `pill-dot ${s === 'online' ? 'live' : ''}`;
+  txt.textContent = s === 'online' ? 'LIVE' : s === 'offline' ? 'OFFLINE' : 'CONNEXION…';
+}
+
+function notify(title, body) {
+  if (Notification.permission === 'granted')
+    new Notification(title, { body });
+}
+
+function now() { return new Date().toLocaleTimeString('fr-FR'); }
+
+function resetAll() {
+  if (!confirm('Réinitialiser SysWatch ?')) return;
+  localStorage.clear(); if (es) es.close(); location.reload();
+}
+
+// ═══════════════════════════════
+//  INIT
+// ═══════════════════════════════
+loadConfig();
+if (cfg.chan) connect();
+if ('Notification' in window && Notification.permission === 'default')
+  Notification.requestPermission();
+</script>
+</body>
+</html>
